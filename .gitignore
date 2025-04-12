@@ -1,2 +1,5 @@
 src/raw_audio/*.wav
 src/chunks/*.wav
+src/XTTS-files/*.pth
+src/training_outputs/
+src/venv/
