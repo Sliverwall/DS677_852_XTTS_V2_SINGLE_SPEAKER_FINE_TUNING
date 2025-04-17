@@ -7,6 +7,7 @@ from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 import csv
 import os
 import sys
+import re
 
 def yt_download(url):
     """
@@ -23,6 +24,9 @@ def yt_download(url):
         capture_output=True, text=True
     )
     title = result.stdout.strip()
+
+    # Clean title by removing special characters
+    title = re.sub(r'[^a-zA-Z0-9_\- ]', '', title)
 
     yt_audio_path = os.path.join(audio_dir, f"{title}.wav")
 
