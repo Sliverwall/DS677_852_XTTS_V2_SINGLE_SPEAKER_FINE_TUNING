@@ -4,3 +4,4 @@ src/XTTS-files/*.pth
 src/training_outputs/
 src/venv/
 src/wandb/
+src/datasets/
