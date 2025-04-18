@@ -5,4 +5,4 @@ src/training_outputs/
 src/venv/
 src/wandb/
 src/datasets/
-src/audio/
+src/audio/*.wav
