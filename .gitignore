@@ -6,4 +6,4 @@ src/venv/
 src/wandb/
 src/datasets/
 src/audio/*.wav
-src/output/*.wav
+src/output/
