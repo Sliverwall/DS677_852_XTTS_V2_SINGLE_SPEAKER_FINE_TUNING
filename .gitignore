@@ -7,3 +7,4 @@ src/wandb/
 src/datasets/
 src/audio/*.wav
 src/output/
+src/.ipynb_checkpoints/
