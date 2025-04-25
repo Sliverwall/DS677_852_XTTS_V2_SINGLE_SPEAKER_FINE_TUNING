@@ -8,6 +8,8 @@ import csv
 import os
 import sys
 import re
+from scipy.stats import truncnorm
+import numpy as np
 
 def yt_download(url):
     """
@@ -41,7 +43,7 @@ def yt_download(url):
 
     return yt_audio_path, title
 
-def chunk_audio(audio_path, video_title):
+def chunk_audio(audio_path, video_title, lower_bound, upper_bound):
     # Create dataset folder
     dataset_dir = f"./datasets/{video_title}"
     if not os.path.exists(dataset_dir):
@@ -55,27 +57,62 @@ def chunk_audio(audio_path, video_title):
     audio = AudioSegment.from_wav(audio_path)  
 
     # Get the total length of time, in ms, for the audio file
-    totalLength = len(audio)
+    total_length = len(audio)
 
-    # Define length of time for each chunk in seconds
-    chunk_length = 10 * 1000  # seconds in ms
+    # Define mean & std dev
+    mean = (upper_bound + lower_bound)/2
+    sd = 1
 
-    # Get the total amount of chunks needed to divide the audio file
-    num_chunks = totalLength // chunk_length + int(totalLength % chunk_length != 0)
+    # Standardize lower & upper bounds
+    std_lower = (lower_bound - mean)/sd
+    std_upper = (upper_bound - mean)/sd
 
-    # display expected number of chunks
-    print(f'Expected number of chunks: {num_chunks}')
+    # Gen random variable with params
+    X = truncnorm(
+        a = std_lower,
+        b = std_upper,
+        loc = mean,
+        scale = sd
+    )
+
+    # Gen samples
+    data = X.rvs(1000)
+
+    # Round data to whole seconds
+    data = np.round(data, decimals=3)
+
+    # convert to ms
+    data_ms = data * 1000
+
+    # Define generation limit in chunks
+    gen_limit = total_length - upper_bound
+    
+    chunks = []
+    gen_chunks = 0
+    num_chunks = 0
 
     # Extract the needed number of audio chunks from the audio file
-    print(f'Chunks saving into {wavs_dir}')
-    for i in range(num_chunks):
+    print(f'Saving chunks into {wavs_dir}')
+    while gen_chunks < gen_limit:
+        # Sample from gen normal distrubtion
+        chunk_len = np.random.choice(data_ms)
+        
         # Get the start and end time for the chunk
-        start = i * chunk_length
-        end = min((i + 1) * chunk_length, totalLength)
-
+        start = gen_chunks
+        end = min(start + chunk_len, total_length)
+        
         # Extract audio and output labeled chunk into ouput dir as a wav file
         chunk = audio[start:end]
-        chunk.export(os.path.join(wavs_dir, f"chunk_{i:04}.wav"), format="wav")
+        chunk.export(os.path.join(wavs_dir, f"chunk_{num_chunks:04}.wav"), format="wav")
+        
+        # Add chunk size to tracker
+        chunks.append(end-start)
+        
+        # Add chunk length to generatedChunk counter
+        gen_chunks += chunk_len
+
+        # add to iterate value
+        num_chunks += 1
 
     return dataset_dir, wavs_dir
 
@@ -159,8 +196,9 @@ def main():
     yt_audio_path, title = yt_download(url)
     print(f'YouTube video: {title} downloaded.')
 
+    lower_bound, upper_bound = 3, 10
     print('Chunking audio...')
-    dataset_dir, wavs_dir = chunk_audio(yt_audio_path, title)
+    dataset_dir, wavs_dir = chunk_audio(yt_audio_path, title, lower_bound, upper_bound)
     print('Audio chunking complete.')
 
     print('Transcribing wavs...')
