@@ -95,8 +95,8 @@ def get_example_audio() -> dict:
         Dictionary with form {'Audio Name': 'Checkpoint Path'}
     """
     audio_mapping = {
-        "Sherlock Holmes": r"C:/Users/caama/Documents/School/NJIT/DS677/Project/run/training/Sherlock-Holmes-2-epochs-April-25-2025_03+08PM-0000000",
-        "Tom Hanks": "FINETUNED MODEL DIR" # CHANGE TO DIRECTORIES
+        "Sherlock Holmes": "FINETUNED MODEL DIR", # CHANGE TO DIRECTORY
+        "Tom Hanks": "FINETUNED MODEL DIR" # CHANGE TO DIRECTORY
     }
 
     # Uploaded and recorded examples (map to default model)
@@ -107,7 +107,7 @@ def get_example_audio() -> dict:
     for sample in user_samples:
         # Map if not in dict
         if sample not in audio_mapping:
-            audio_mapping[sample] = "./XTTS-files/"
+            audio_mapping[sample] = "../XTTS-files/" # CHANGE TO DIRECTORY
 
     return audio_mapping
     

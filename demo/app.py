@@ -98,7 +98,7 @@ if generate_button:
     else:
         # Determine the reference audio file path
         if selected_audio_name == "Sherlock Holmes":
-            reference_audio_path = "C:/Users/caama/Documents/School/NJIT/DS677/Project/datasets/Sherlock Holmes Stories  Read by Benedict Cumberbatch/wavs/chunk_0220.wav"
+            reference_audio_path = "path/to/fine_tuned_audio/" # CHANGE TO REFERENCE AUDIO
         elif selected_audio_name == "Tom Hanks":
             reference_audio_path = "path/to/fine_tuned_audio/" # CHANGE TO REFERENCE AUDIO
         else:

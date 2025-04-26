@@ -10,7 +10,7 @@ def gen_audio(text: str,
             checkpoint_dir: str,
             reference_wav: str,
             output_path: str,
-            vocab_path: Optional[str]="../XTTS-files/vocab.json",
+            vocab_path: Optional[str]="../XTTS-files/vocab.json", # CHANGE TO DIRECTORY
             split_sentences: bool=True,
             temperature: float=0.7,
 ) -> str:
