@@ -8,7 +8,7 @@ import csv
 import os
 import sys
 import re
-from scipy.stats import truncnorm
+from scipy.stats import truncnorm, zscore
 import numpy as np
 
 def yt_download(url):
@@ -183,6 +183,48 @@ def transcribe_wavs(dataset_dir, wavs_dir):
             csv_writer.writerow(entry)
 
     return csv_path
+
+def clean_transcription(wavs_dir, csv_path):
+    MAX_CHAR_LEN = 250
+    Z_SCORE_MAX = 2
+
+    # Read metadata
+    cols = ["file_name", "text", "normalized_text"]
+    df = pd.read_csv(csv_path, sep="|", header=None, names=cols)
+    df["text_len"] = df["text"].str.len()
+
+    # Filter entries exceeding max char length
+    df = df[df["text_len"] <= MAX_CHAR_LEN]
+
+    # Read wav file durations
+    file_list = os.listdir(wavs_dir)
+    file_sizes = []
+
+    for file in file_list:
+        file_name = os.path.splitext(file)[0]
+        audio_path = os.path.join(wavs_dir, file)
+        audio_ms = len(AudioSegment.from_wav(audio_path))
+        file_sizes.append([file_name, audio_ms])
+
+    pairing_cols = ["file_name", "length_ms"]
+    pairing_df = pd.DataFrame(file_sizes, columns=pairing_cols)
+
+    # Merge metadata with audio durations
+    stats_df = pd.merge(df, pairing_df, on="file_name", how="left")
+    stats_df["ms_per_char"] = stats_df["length_ms"] / stats_df["text_len"]
+
+    # Z-score for outlier detection
+    stats_df["z_score"] = zscore(stats_df["ms_per_char"])
+    stats_df["outlier"] = stats_df["z_score"].abs() > Z_SCORE_MAX
+
+    # Remove outliers
+    stats_df = stats_df[stats_df["outlier"] == False]
+
+    # Filter original metadata to match cleaned set
+    output_df = pd.merge(df, stats_df[["file_name"]], on="file_name", how="inner")
+
+    # Overwrite the original metadata file
+    output_df.to_csv(csv_path, sep="|", index=False, header=False)
 
 def main():
     # get URL
