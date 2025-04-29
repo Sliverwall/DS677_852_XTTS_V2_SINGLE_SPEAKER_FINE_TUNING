@@ -40,7 +40,7 @@ if record_option == "Record Audio":
 
     if recorded_audio:
         # Verify audio len
-        if valid_audio(recorded_audio, MIN_DURATION_SEC, MAX_DURATION_SEC):
+        if valid_audio(recorded_audio, MIN_DURATION_SEC, MAX_DURATION_SEC, audio_format="wav"):
             with st.form("save_recording_form"):
                 filename_input = st.text_input("Enter a name for the recording:").strip() # Name to save recording
                 save_recording = st.form_submit_button("Save Recording")
@@ -50,7 +50,7 @@ if record_option == "Record Audio":
                     else:
                         output_path = RECORDINGS_DIR / f"{filename_input}.wav"
                         # Resample & save as wav
-                        resample_wav(recorded_audio, output_path)
+                        resample_wav(recorded_audio, output_path, audio_format="wav")
                         st.success(f"Recording saved as '{filename_input}.wav'.")
         else:
             st.error(f"Recording must be between {MIN_DURATION_SEC}-{MAX_DURATION_SEC} seconds.")
@@ -59,14 +59,19 @@ else:
     uploaded_audio = st.file_uploader("Upload an Audio File (.wav or .mp3)", type=["wav", "mp3"])
     if uploaded_audio:
         file_name = Path(uploaded_audio.name).stem
+        file_ext = Path(uploaded_audio.name).suffix.lower()
         # Verify audio len
-        if valid_audio(uploaded_audio, MIN_DURATION_SEC, MAX_DURATION_SEC):
-            output_path = UPLOADS_DIR / f"{file_name}.wav"
-            # Resample & save as wav
-            resample_wav(uploaded_audio, output_path)
-            st.success(f"Upload saved as '{file_name}.wav'.")
+        if file_ext not in [".wav", ".mp3"]:
+            st.error("Unsupported file type. Only .wav and .mp3 are allowed.")
         else:
-            st.error(f"Upload must be between {MIN_DURATION_SEC}-{MAX_DURATION_SEC} seconds.")
+            audio_format = "wav" if file_ext == ".wav" else "mp3"
+            if valid_audio(uploaded_audio, MIN_DURATION_SEC, MAX_DURATION_SEC, audio_format):
+                output_path = UPLOADS_DIR / f"{file_name}.wav"
+                # Resample & save as wav
+                resample_wav(uploaded_audio, output_path, audio_format=audio_format)
+                st.success(f"Upload saved as '{file_name}.wav'.")
+            else:
+                st.error(f"Upload must be between {MIN_DURATION_SEC}-{MAX_DURATION_SEC} seconds.")
         
 
 # ---------- Selecting Example Audio ---------- 
@@ -97,8 +102,8 @@ if generate_button:
         st.error("Please enter text before generating.")
     else:
         # Determine the reference audio file path
-        if selected_audio_name == "Sherlock Holmes":
-            reference_audio_path = "path/to/fine_tuned_audio/" # CHANGE TO REFERENCE AUDIO
+        if selected_audio_name == "Benedict Cumberbatch":
+            reference_audio_path = "C:/Users/caama/Documents/School/NJIT/DS677/Project/datasets/Sherlock Holmes Stories  Read by Benedict Cumberbatch/wavs/chunk_0220.wav"
         elif selected_audio_name == "Tom Hanks":
             reference_audio_path = "path/to/fine_tuned_audio/" # CHANGE TO REFERENCE AUDIO
         else:

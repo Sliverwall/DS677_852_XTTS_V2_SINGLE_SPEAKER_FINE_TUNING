@@ -25,7 +25,7 @@ def ffmpeg_check() -> bool:
     """Check if FFmpeg is installed."""
     return shutil.which("ffmpeg") is not None
 
-def resample_wav(audio_file, output_path: Path, sample_rate: int=16000):
+def resample_wav(audio_file, output_path: Path, sample_rate: int=16000, audio_format: str=None):
     """Convert an audio file to WAV format with the specified sample rate.
     
     Args:
@@ -39,9 +39,9 @@ def resample_wav(audio_file, output_path: Path, sample_rate: int=16000):
     try:
         # Read audio
         if isinstance(audio_file, BytesIO):
-            audio = AudioSegment.from_file(audio_file)
+            audio = AudioSegment.from_file(audio_file, format=audio_format)
         else:
-            audio = AudioSegment.from_file(BytesIO(audio_file.read()))
+            audio = AudioSegment.from_file(BytesIO(audio_file.read()), format=audio_format)
 
         # Resample & save as wav
         audio = audio.set_frame_rate(sample_rate).set_channels(1)
@@ -49,7 +49,7 @@ def resample_wav(audio_file, output_path: Path, sample_rate: int=16000):
     except Exception as e:
         st.error(f"Error converting audio: {e}")
 
-def valid_audio(audio_file: AudioSegment, min_sec: int, max_sec: int) -> bool:
+def valid_audio(audio_file: AudioSegment, min_sec: int, max_sec: int, audio_format: str=None) -> bool:
     """Validate audio duration in seconds.
         Args:
             audio_file:
@@ -66,9 +66,9 @@ def valid_audio(audio_file: AudioSegment, min_sec: int, max_sec: int) -> bool:
     try:
         # Read audio
         if isinstance(audio_file, BytesIO):
-            audio = AudioSegment.from_file(audio_file)
+            audio = AudioSegment.from_file(audio_file, format=audio_format)
         else:
-            audio = AudioSegment.from_file(BytesIO(audio_file.read()))
+            audio = AudioSegment.from_file(BytesIO(audio_file.read()), format=audio_format)
 
         # Validate duration
         duration_sec = len(audio) / 1000.0
@@ -95,8 +95,8 @@ def get_example_audio() -> dict:
         Dictionary with form {'Audio Name': 'Checkpoint Path'}
     """
     audio_mapping = {
-        "Sherlock Holmes": "FINETUNED MODEL DIR", # CHANGE TO DIRECTORY
-        "Tom Hanks": "FINETUNED MODEL DIR" # CHANGE TO DIRECTORY
+        "Sherlock Holmes": r"C:/Users/caama/Documents/School/NJIT/DS677/Project/run/training/Sherlock-Holmes-2-epochs-April-25-2025_03+08PM-0000000",
+        "Tom Hanks": "FINETUNED MODEL DIR" # CHANGE TO DIRECTORIES
     }
 
     # Uploaded and recorded examples (map to default model)
@@ -107,7 +107,7 @@ def get_example_audio() -> dict:
     for sample in user_samples:
         # Map if not in dict
         if sample not in audio_mapping:
-            audio_mapping[sample] = "../XTTS-files/" # CHANGE TO DIRECTORY
+            audio_mapping[sample] = "../XTTS-files/"
 
     return audio_mapping
     
