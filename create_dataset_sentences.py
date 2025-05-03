@@ -108,72 +108,99 @@ def resample_audio(audio_path):
 
     return audio_path
 
-def chunk_sentences(audio_path, title, min_sec=MIN_SEC, max_sec=MAX_SEC, compute_type=COMPUTE_TYPE, batch_size=BATCH_SIZE, whisper_model=WHISPER_MODEL):
-    # Create dataset folder
-    dataset_dir = f"./datasets/{title}"
-    if not os.path.exists(dataset_dir):
-        os.makedirs(dataset_dir)
+def chunk_sentences(
+    audio_path,
+    title,
+    min_sec: float = MIN_SEC,
+    max_sec: float = MAX_SEC,
+    char_limit: int = 250,
+    compute_type: str = COMPUTE_TYPE,
+    batch_size: int = BATCH_SIZE,
+    whisper_model: str = WHISPER_MODEL,
+):
+    dataset_dir = os.path.join("./datasets", title)
+    wavs_dir     = os.path.join(dataset_dir, "wavs")
+    os.makedirs(wavs_dir, exist_ok=True)
 
-    wavs_dir = os.path.join(dataset_dir, 'wavs')
-    if not os.path.exists(wavs_dir):
-        os.makedirs(wavs_dir)
-
-    # Set device and torch data type
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f'Using device: {device}')
+    print(f"Using device: {device}")
 
-    print("Transcribing and aligning with WhisperX.")
-    model = whisperx.load_model(whisper_model, device=device, compute_type=compute_type)
-    audio = whisperx.load_audio(audio_path)
-    result = model.transcribe(audio, batch_size=16, language="en")
-    model_a, metadata = whisperx.load_align_model(language_code="en", device=device)
-    aligned = whisperx.align(result["segments"], model_a, metadata, audio, device, return_char_alignments=False)
+    # WhisperX transcription + alignment
+    model      = whisperx.load_model(whisper_model, device=device, compute_type=compute_type)
+    audio_arr  = whisperx.load_audio(audio_path)
+    base       = model.transcribe(audio_arr, batch_size=batch_size, language="en")
+    align_mdl, meta = whisperx.load_align_model("en", device)
+    aligned    = whisperx.align(base["segments"], align_mdl, meta, audio_arr,
+                                device, return_char_alignments=False)
 
-    word_segments = aligned["word_segments"]
-    full_text = " ".join([w["word"] for w in word_segments])
-    sentences = sent_tokenize(full_text)
+    word_segs  = aligned["word_segments"]
+    full_text  = " ".join(w["word"] for w in word_segs)
+    sentences  = sent_tokenize(full_text)
 
-    sentence_segments = []
-    word_index = 0
+    # map sentences -> (start, end)
+    sent_segs, idx = [], 0
     for sent in sentences:
-        num_words = len(sent.split())
-        if word_index + num_words > len(word_segments):
+        n = len(sent.split())
+        if idx + n > len(word_segs):
             break
-        start = word_segments[word_index]["start"]
-        end = word_segments[word_index + num_words - 1]["end"]
-        sentence_segments.append({"text": sent, "start": start, "end": end})
-        word_index += num_words
+        sent_segs.append({
+            "text":  sent,
+            "start": word_segs[idx]["start"],
+            "end":   word_segs[idx + n - 1]["end"],
+        })
+        idx += n
 
-    # Merge segments if under threshold
-    merged = []
-    buffer, buffer_duration = [], 0.0
-    for s in sentence_segments:
-        dur = s["end"] - s["start"]
-        if min_sec <= dur <= max_sec:
-            merged.append(s)
-        else:
-            buffer.append(s)
-            buffer_duration += dur
-            if buffer_duration >= min_sec:
-                merged.append({
-                    "text": " ".join(b["text"] for b in buffer),
-                    "start": buffer[0]["start"],
-                    "end": buffer[-1]["end"]
-                })
-                buffer = []
-                buffer_duration = 0.0
+    # Build chunks respecting all limits
+    chunks, buf, dur, txt = [], [], 0.0, ""
+    for seg in sent_segs:
+        seg_dur  = seg["end"] - seg["start"]
+        seg_text = seg["text"]
+        # Case 1: sentence is valid and fits limits
+        if min_sec <= seg_dur <= max_sec and len(seg_text) <= char_limit:
+            if buf:
+                chunks.append(buf)
+                buf, dur, txt = [], 0.0, ""
+            chunks.append([seg])
+            continue
 
-    # Export Chunks and Transcriptions
-    audio = AudioSegment.from_file(audio_path)
-    metadata_path = os.path.join(dataset_dir, "metadata.csv")
-    with open(metadata_path, "w", encoding="utf-8-sig") as f:
-        for i, seg in enumerate(merged):
-            start_ms = int(seg["start"] * 1000)
-            end_ms = int(seg["end"] * 1000)
-            chunk = audio[start_ms:end_ms]
-            fname = f"chunk_{i:04}.wav"
-            chunk.export(os.path.join(wavs_dir, fname), format="wav")
-            f.write(f"{os.path.splitext(fname)[0]}|{seg['text']}|{seg['text']}\n")
+        # Case 2: add sentence to buffer
+        if dur + seg_dur > max_sec or len(txt) + 1 + len(seg_text) > char_limit:
+            if dur >= min_sec:
+                chunks.append(buf)
+                buf, dur, txt = [], 0.0, ""
+            else:
+                # buffer too short
+                pass
+
+        buf.append(seg)
+        dur += seg_dur
+        txt += (" " if txt else "") + seg_text
+
+    if buf:
+        chunks.append(buf)
+
+    # Write wavs + metadata
+    audio               = AudioSegment.from_file(audio_path)
+    metadata_path       = os.path.join(dataset_dir, "metadata.csv")
+    with open(metadata_path, "w", encoding="utf‑8‑sig") as meta_f:
+        for i, chunk in enumerate(chunks):
+            start  = int(chunk[0]["start"] * 1000)
+            end    = int(chunk[-1]["end"] * 1000)
+            if end <= start:
+                continue
+            piece  = audio[start:end]
+            if len(piece) < min_sec*1000 or len(piece) > max_sec*1000:
+                continue # double‑check duration
+            fname  = f"chunk_{i:04}.wav"
+            piece.export(os.path.join(wavs_dir, fname), format="wav")
+
+            text   = " ".join(c["text"] for c in chunk)
+            if len(text) > char_limit: # final text safety check
+                # Truncate at nearest word before limit
+                text = text[:char_limit].rsplit(" ", 1)[0] + " …"
+
+            # Write LJSpeech‑style row: <id>|<text>|<text>
+            meta_f.write(f"{os.path.splitext(fname)[0]}|{text}|{text}\n")
 
     return dataset_dir, wavs_dir
 
