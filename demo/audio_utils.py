@@ -95,8 +95,8 @@ def get_example_audio() -> dict:
         Dictionary with form {'Audio Name': 'Checkpoint Path'}
     """
     audio_mapping = {
-        "Sherlock Holmes": r"C:/Users/caama/Documents/School/NJIT/DS677/Project/run/training/Sherlock-Holmes-2-epochs-April-25-2025_03+08PM-0000000",
-        "Tom Hanks": "FINETUNED MODEL DIR" # CHANGE TO DIRECTORIES
+        "Benedict Cumberbatch": r"C:/Users/caama/Documents/School/NJIT/DS677/Project/run/training/Sherlock-Holmes-2-epochs-April-25-2025_03+08PM-0000000",
+        "Tom Hanks": r"C:/Users/caama/Documents/School/NJIT/DS677/Project/models/Tom Hanks"
     }
 
     # Uploaded and recorded examples (map to default model)

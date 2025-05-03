@@ -105,7 +105,7 @@ if generate_button:
         if selected_audio_name == "Benedict Cumberbatch":
             reference_audio_path = "C:/Users/caama/Documents/School/NJIT/DS677/Project/datasets/Sherlock Holmes Stories  Read by Benedict Cumberbatch/wavs/chunk_0220.wav"
         elif selected_audio_name == "Tom Hanks":
-            reference_audio_path = "path/to/fine_tuned_audio/" # CHANGE TO REFERENCE AUDIO
+            reference_audio_path = "C:/Users/caama/Documents/School/NJIT/DS677/Project/models/Tom Hanks/chunk_0009.wav"
         else:
             # Look for the saved user recordings/uploads
             if (RECORDINGS_DIR / f"{selected_audio_name}.wav").exists():
