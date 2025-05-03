@@ -1,15 +1,15 @@
 import subprocess
 import os
+import argparse
 from pydub import AudioSegment
-import webvtt
 import torch
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 import csv
-import os
 import sys
 import re
 from scipy.stats import truncnorm, zscore
 import numpy as np
+import pandas as pd
 
 def yt_download(url):
     """
@@ -42,6 +42,46 @@ def yt_download(url):
     ])
 
     return yt_audio_path, title
+
+def load_and_concat(file_paths, title, normalize_dbfs=-20.0):
+    # Create audio folder
+    audio_dir = f"./audio/"
+    if not os.path.exists(audio_dir):
+        os.makedirs(audio_dir)
+    
+    output_path = os.path.join("audio", f"{title}.wav")
+
+    segments = [AudioSegment.from_file(path) for path in file_paths]
+    combined = sum(segments) if len(segments) > 1 else segments[0]
+
+    # Normalize loudness
+    print(f"Combined loudness before normalization: {combined.dBFS:.2f} dBFS")
+    change_dBFS = normalize_dbfs - combined.dBFS
+    combined = combined.apply_gain(change_dBFS)
+    print(f"Normalized loudness to {normalize_dbfs} dBFS")
+
+    combined.export(output_path, format="wav")
+
+    return output_path
+
+def resample_audio(audio_path):
+    audio = AudioSegment.from_file(audio_path)
+
+    frame_rate = audio.frame_rate
+    channels = audio.channels
+    sample_width_bits = audio.sample_width * 8
+
+    print(f"Original audio: {frame_rate} Hz, {channels} channel(s), {sample_width_bits}-bit")
+
+    if frame_rate != 22050 or channels != 1 or sample_width_bits != 16:
+        print("Resampling to 22050 Hz, mono, 16-bit PCM.")
+        resampled = audio.set_frame_rate(22050).set_channels(1).set_sample_width(2)
+        resampled.export(audio_path, format="wav")
+        print("Resampling complete and file overwritten.")
+    else:
+        print("Audio already meets the required format.")
+
+    return audio_path
 
 def chunk_audio(audio_path, video_title, lower_bound, upper_bound):
     # Create dataset folder
@@ -227,25 +267,42 @@ def clean_transcription(wavs_dir, csv_path):
     output_df.to_csv(csv_path, sep="|", index=False, header=False)
 
 def main():
-    # get URL
-    if len(sys.argv) < 2:
-        print("Usage: python your_script.py <YouTube_URL>")
+    parser = argparse.ArgumentParser(description="Create dataset from YouTube or audio files.")
+    group = parser.add_mutually_exclusive_group(required=True) # User must specify one or the other
+    group.add_argument('--url', type=str, help='YouTube URL to download audio from')
+    group.add_argument('--files', nargs='+', help='List of audio files to process directly') # nargs='+': one or more values
+    parser.add_argument('--title', type=str, help='Title prefix when using --files')
+
+    args = parser.parse_args()
+
+    # Post-parse validation
+    if args.url and args.title:
+        print("Error: --title can only be used with --files.")
         sys.exit(1)
 
-    url = sys.argv[1]
+    if args.url:
+        print('Downloading YouTube video...')
+        audio_path, title = yt_download(args.url)
+        print(f'YouTube video: {title} downloaded.')
+    else:
+        title = args.title if args.title else "local_audio"
+        print('Loading and concatenating input files.')
+        audio_path = load_and_concat(args.files, title)
+        print(f"{len(args.files)} file(s) loaded and concatenated.")
+        print(f"Audio written to: {audio_path}")
 
-    print('Downloading YouTube video...')
-    yt_audio_path, title = yt_download(url)
-    print(f'YouTube video: {title} downloaded.')
+    print('Resampling audio to 24kHz.')
+    audio_path = resample_audio(audio_path)
+    print('Audio resampling complete.')
 
     lower_bound, upper_bound = 3, 10
     print('Chunking audio...')
-    dataset_dir, wavs_dir = chunk_audio(yt_audio_path, title, lower_bound, upper_bound)
+    dataset_dir, wavs_dir = chunk_audio(audio_path, title, lower_bound, upper_bound)
     print('Audio chunking complete.')
 
     print('Transcribing wavs...')
     csv_path = transcribe_wavs(dataset_dir, wavs_dir)
-    print("Transcriptions written to:", csv_path)
+    print(f"Transcriptions written to: {csv_path}")
 
 if __name__ == "__main__":
     main()
