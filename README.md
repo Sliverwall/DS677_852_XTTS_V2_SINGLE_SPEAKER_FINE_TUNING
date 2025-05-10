@@ -1,7 +1,7 @@
 ---
 # DS677_852_Project: Single-Speaker Fine-Tuning with Coqui AI's XTTS v2 Model
 
-**Authors:** Giuseppe Di Roberto and Roberto Caamano
+Giuseppe Di Roberto and Roberto Caamano
 
 ---
 
@@ -50,7 +50,7 @@ Please follow their guide for downloading and installing. Ideally, you should ha
 
 The diagram below summarizes the entire fine-tuning pipeline, from raw audio to a customized TTS model:
 
-![Workflow Diagram](assets/data_prep.png)
+![Workflow Diagram](workflow.png)
 
 ---
 
