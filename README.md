@@ -17,7 +17,7 @@ This project shows how to fine-tune a single-speaker text-to-speech model using 
 
 To begin fine-tuning XTTS v2, you'll need a few dependencies and scripts.
 
-We recommend using the actively maintained XTTS repo from [Idiap Research Institute](https://github.com/idiap/coqui-ai-TTS/tree/dev).
+We recommend using the actively maintained XTTS repo from [Maintained Repo](https://github.com/idiap/coqui-ai-TTS/tree/dev).
 
 Please follow their guide for downloading and installing. Ideally, you should have it installed locally if you're planning to do more than just inference.
 
