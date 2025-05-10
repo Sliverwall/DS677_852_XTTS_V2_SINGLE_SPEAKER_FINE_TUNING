@@ -1,7 +1,7 @@
 ---
 # DS677_852_Project: Single-Speaker Fine-Tuning with Coqui AI's XTTS v2 Model
 
-**Group 1:** Giuseppe Di Roberto and Roberto Caamano
+### Group 1: Giuseppe Di Roberto and Roberto Caamano
 
 ---
 
