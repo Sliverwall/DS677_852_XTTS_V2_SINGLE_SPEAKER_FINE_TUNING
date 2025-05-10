@@ -27,7 +27,7 @@ Please follow their guide for downloading and installing. Ideally, you should ha
 
 - **`create_dataset_sentences.py`**  
   This script prepares the dataset by chunking and cleaning raw audio input.  
-  ⚠️ *Note:* It’s set to pull audio from a URL by default, but you can modify it to use a local `.wav` file instead.
+  ⚠️ *Note:* It’s set to pull audio from a YouTube URL by default, but you can modify it to use a local `.wav` file instead.
 
 - **`fine_tune.py`**  
   Use this to launch the fine-tuning process with your prepared dataset.
