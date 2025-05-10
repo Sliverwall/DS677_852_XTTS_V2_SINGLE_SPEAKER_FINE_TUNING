@@ -48,7 +48,7 @@ Please follow their guide for downloading and installing. Ideally, you should ha
 
 ## Workflow Overview
 
-The diagram below summarizes the entire fine-tuning pipeline, from raw audio to a customized TTS model:
+The diagram below summarizes how to go from raw audio to ready to fine-tune. For more details on the fine-tuning process. Please consider reading the report provided, and the presentation linked in the report:
 
 ![Workflow Diagram](workflow.png)
 
