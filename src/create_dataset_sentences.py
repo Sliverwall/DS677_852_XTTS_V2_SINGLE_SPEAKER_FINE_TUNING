@@ -19,7 +19,8 @@ torch.backends.cudnn.allow_tf32 = True
 import whisperx
 import nltk
 
-NLTK_DIR = "C:/ProgramData/miniconda3/envs/DS677_Project/Lib/nltk_data"
+# Set up NLTK data directory and download required tokenizer data
+NLTK_DIR = "<DIRECTORY>"
 
 nltk.download('punkt', download_dir=NLTK_DIR)
 nltk.download('punkt_tab', download_dir=NLTK_DIR)
@@ -39,6 +40,7 @@ WHISPER_MODEL = "large-v3" # Options: tiny, base, small, medium, large-v2, large
 def yt_download(url):
     """
     Downloads a wav file from given YouTube url.
+    Returns the audio path and a cleaned video title.
     """
     # Create audio folder
     audio_dir = f"./audio/"
@@ -57,6 +59,7 @@ def yt_download(url):
 
     yt_audio_path = os.path.join(audio_dir, f"{title}.wav")
 
+    # Download and convert to WAV format
     subprocess.run([
         "yt-dlp",
         "-f", "bestaudio",
@@ -69,6 +72,10 @@ def yt_download(url):
     return yt_audio_path, title
 
 def load_and_concat(file_paths, title, normalize_dbfs=-20.0):
+    """
+    Concatenates multiple audio files into one and normalizes its loudness.
+    """
+
     # Create audio folder
     audio_dir = f"./audio/"
     if not os.path.exists(audio_dir):
@@ -76,10 +83,11 @@ def load_and_concat(file_paths, title, normalize_dbfs=-20.0):
     
     output_path = os.path.join("audio", f"{title}.wav")
 
+    # Load and concatenate
     segments = [AudioSegment.from_file(path) for path in file_paths]
     combined = sum(segments) if len(segments) > 1 else segments[0]
 
-    # Normalize loudness
+    # Normalize loudness to target dBFS
     print(f"Combined loudness before normalization: {combined.dBFS:.2f} dBFS")
     change_dBFS = normalize_dbfs - combined.dBFS
     combined = combined.apply_gain(change_dBFS)
@@ -90,6 +98,9 @@ def load_and_concat(file_paths, title, normalize_dbfs=-20.0):
     return output_path
 
 def resample_audio(audio_path):
+    """
+    Resamples audio to 22050 Hz, mono, 16-bit PCM if not already in that format.
+    """
     audio = AudioSegment.from_file(audio_path)
 
     frame_rate = audio.frame_rate
@@ -98,6 +109,7 @@ def resample_audio(audio_path):
 
     print(f"Original audio: {frame_rate} Hz, {channels} channel(s), {sample_width_bits}-bit")
 
+    # Resample if needed
     if frame_rate != 22050 or channels != 1 or sample_width_bits != 16:
         print("Resampling to 22050 Hz, mono, 16-bit PCM.")
         resampled = audio.set_frame_rate(22050).set_channels(1).set_sample_width(2)
@@ -118,44 +130,47 @@ def chunk_sentences(
     batch_size: int = BATCH_SIZE,
     whisper_model: str = WHISPER_MODEL,
 ):
+    """
+    Transcribes, aligns, and chunks the audio into sentence-level WAV files and metadata.
+    """
+
     dataset_dir = os.path.join("./datasets", title)
-    wavs_dir     = os.path.join(dataset_dir, "wavs")
+    wavs_dir = os.path.join(dataset_dir, "wavs")
     os.makedirs(wavs_dir, exist_ok=True)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
 
     # WhisperX transcription + alignment
-    model      = whisperx.load_model(whisper_model, device=device, compute_type=compute_type)
-    audio_arr  = whisperx.load_audio(audio_path)
-    base       = model.transcribe(audio_arr, batch_size=batch_size, language="en")
+    model = whisperx.load_model(whisper_model, device=device, compute_type=compute_type)
+    audio_arr = whisperx.load_audio(audio_path)
+    base = model.transcribe(audio_arr, batch_size=batch_size, language="en")
     align_mdl, meta = whisperx.load_align_model("en", device)
-    aligned    = whisperx.align(base["segments"], align_mdl, meta, audio_arr,
-                                device, return_char_alignments=False)
+    aligned = whisperx.align(base["segments"], align_mdl, meta, audio_arr, device, return_char_alignments=False)
 
-    word_segs  = aligned["word_segments"]
-    full_text  = " ".join(w["word"] for w in word_segs)
-    sentences  = sent_tokenize(full_text)
+    word_segs = aligned["word_segments"]
+    full_text = " ".join(w["word"] for w in word_segs)
+    sentences = sent_tokenize(full_text)
 
-    # map sentences -> (start, end)
+    # Map sentences to audio time segments
     sent_segs, idx = [], 0
     for sent in sentences:
         n = len(sent.split())
         if idx + n > len(word_segs):
             break
         sent_segs.append({
-            "text":  sent,
+            "text": sent,
             "start": word_segs[idx]["start"],
-            "end":   word_segs[idx + n - 1]["end"],
+            "end": word_segs[idx + n - 1]["end"],
         })
         idx += n
 
     # Build chunks respecting all limits
     chunks, buf, dur, txt = [], [], 0.0, ""
     for seg in sent_segs:
-        seg_dur  = seg["end"] - seg["start"]
+        seg_dur = seg["end"] - seg["start"]
         seg_text = seg["text"]
-        # Case 1: sentence is valid and fits limits
+        # Case 1: if the sentence alone fits, store it as its own chunk
         if min_sec <= seg_dur <= max_sec and len(seg_text) <= char_limit:
             if buf:
                 chunks.append(buf)
@@ -163,7 +178,7 @@ def chunk_sentences(
             chunks.append([seg])
             continue
 
-        # Case 2: add sentence to buffer
+        # Case 2: try to build a buffer of smaller sentences
         if dur + seg_dur > max_sec or len(txt) + 1 + len(seg_text) > char_limit:
             if dur >= min_sec:
                 chunks.append(buf)
@@ -180,24 +195,26 @@ def chunk_sentences(
         chunks.append(buf)
 
     # Write wavs + metadata
-    audio               = AudioSegment.from_file(audio_path)
-    metadata_path       = os.path.join(dataset_dir, "metadata.csv")
+    audio = AudioSegment.from_file(audio_path)
+    metadata_path = os.path.join(dataset_dir, "metadata.csv")
     with open(metadata_path, "w", encoding="utf‑8‑sig") as meta_f:
         for i, chunk in enumerate(chunks):
-            start  = int(chunk[0]["start"] * 1000)
-            end    = int(chunk[-1]["end"] * 1000)
+            start = int(chunk[0]["start"] * 1000)
+            end = int(chunk[-1]["end"] * 1000)
             if end <= start:
                 continue
             piece  = audio[start:end]
+
+            # Check duration boundaries again
             if len(piece) < min_sec*1000 or len(piece) > max_sec*1000:
-                continue # double‑check duration
-            fname  = f"chunk_{i:04}.wav"
+                continue
+            fname = f"chunk_{i:04}.wav"
             piece.export(os.path.join(wavs_dir, fname), format="wav")
 
-            text   = " ".join(c["text"] for c in chunk)
-            if len(text) > char_limit: # final text safety check
-                # Truncate at nearest word before limit
-                text = text[:char_limit].rsplit(" ", 1)[0] + " …"
+            # Prepare and sanitize transcript
+            text = " ".join(c["text"] for c in chunk)
+            if len(text) > char_limit:
+                text = text[:char_limit].rsplit(" ", 1)[0] + " …" # Truncate at nearest word before limit
 
             # Write LJSpeech‑style row: <id>|<text>|<text>
             meta_f.write(f"{os.path.splitext(fname)[0]}|{text}|{text}\n")
